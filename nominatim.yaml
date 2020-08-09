@@ -1,0 +1,58 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nominatim
+spec:
+  ports:
+    - port: 80
+      targetPort: 8080
+      protocol: TCP
+  selector:
+    app: nominatim
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nominatim
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: nominatim
+        env: prod
+    spec:
+      volumes:
+        - name: svc-cm
+          configMap:
+            name: svc-cm
+      containers:
+        - name: nominatim-k8s
+          image: shemul/nominatim-kubernetes
+          env:
+            - name: NOMINATIM_MODE
+              value: RESTORE
+            - name: NOMINATIM_DATA_LABEL
+              value: bangladesh-20200413
+            - name: NOMINATIM_SA_KEY_PATH
+              value: "/config-map/svc-cm/svc.json"
+            - name: NOMINATIM_PROJECT_ID
+              value: my-project
+            - name: NOMINATIM_GS_BUCKET
+              value: "gs://my-bucket"
+          volumeMounts:
+            - name: svc-cm
+              readOnly: true
+              mountPath: /config-map/svc-cm
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /search
+              port: 8080
+            initialDelaySeconds: 30
+            timeoutSeconds: 1
+  selector:
+    matchLabels:
+      app: nominatim
+      env: prod
